@@ -1,26 +1,20 @@
 // ==UserScript==
-// @name         MyClient Base (EaglerForge 1.12)
-// @version      1.0.0
-// @description  A modular client framework for EaglerForge 1.12 (JS)
+// @name         MyClient Fixed (EaglerForge 1.12)
+// @version      1.1
+// @description  Working client base with Fullbright + Keystrokes + FPS
 // ==/UserScript==
 
-/* ============================================================
-   CLIENT CORE
-   ============================================================ */
-
 const Client = {
-    name: "MyClient",
-    version: "1.0",
     modules: [],
     keybinds: {},
 
     log(msg) {
-        ModAPI.displayToChat({ msg: `§b[${this.name}] §f${msg}` });
+        ModAPI.displayToChat({ msg: "§b[MyClient] §f" + msg });
     },
 
-    registerModule(module) {
-        this.modules.push(module);
-        this.log(`Loaded module: §a${module.name}`);
+    registerModule(m) {
+        this.modules.push(m);
+        this.log("Loaded module: §a" + m.name);
     },
 
     registerKey(key, callback) {
@@ -28,15 +22,10 @@ const Client = {
     }
 };
 
-/* ============================================================
-   MODULE CLASS
-   ============================================================ */
-
 class Module {
-    constructor(name, key, description) {
+    constructor(name, key) {
         this.name = name;
         this.key = key;
-        this.description = description;
         this.enabled = false;
 
         Client.registerKey(key, () => this.toggle());
@@ -45,7 +34,7 @@ class Module {
 
     toggle() {
         this.enabled = !this.enabled;
-        Client.log(`${this.name} ${this.enabled ? "§aEnabled" : "§cDisabled"}`);
+        Client.log(`${this.name} ${this.enabled ? "§aON" : "§cOFF"}`);
         if (this.enabled && this.onEnable) this.onEnable();
         if (!this.enabled && this.onDisable) this.onDisable();
     }
@@ -55,80 +44,80 @@ class Module {
 }
 
 /* ============================================================
-   MODULES
+   FULLBRIGHT (FIXED)
    ============================================================ */
 
-/* ---------- FULLBRIGHT ---------- */
-new Module("Fullbright", "F", "Brightens the world") .onEnable = function () {
+const Fullbright = new Module("Fullbright", "F");
+
+Fullbright.onEnable = function () {
     const mc = ModAPI.getMinecraft();
     this.oldGamma = mc.gameSettings.gammaSetting;
     mc.gameSettings.gammaSetting = 1000;
 };
 
-Module.prototype.onDisable = function () {
-    if (this.name === "Fullbright") {
-        const mc = ModAPI.getMinecraft();
-        mc.gameSettings.gammaSetting = this.oldGamma || 1.0;
-    }
+Fullbright.onDisable = function () {
+    const mc = ModAPI.getMinecraft();
+    mc.gameSettings.gammaSetting = this.oldGamma || 1.0;
 };
 
-/* ---------- FPS DISPLAY ---------- */
-new Module("FPS Display", "G", "Shows FPS on screen").onRender = function () {
+// Force gamma every tick (fixes 1.12 overwrite bug)
+Fullbright.onUpdate = function () {
+    if (!this.enabled) return;
+    const mc = ModAPI.getMinecraft();
+    mc.gameSettings.gammaSetting = 1000;
+};
+
+/* ============================================================
+   FPS DISPLAY
+   ============================================================ */
+
+const FPS = new Module("FPS Display", "G");
+
+FPS.onRender = function () {
     if (!this.enabled) return;
     const fps = ModAPI.getFPS();
     ModAPI.drawStringOnScreen({
         text: `FPS: ${fps}`,
         x: 4,
         y: 4,
-        color: 0xFFFFFF,
+        color: 0xffffff,
         shadow: true
     });
 };
 
-/* ---------- KEYSTROKES ---------- */
-new Module("Keystrokes", "K", "Shows WASD keys").onRender = function () {
+/* ============================================================
+   KEYSTROKES (FIXED)
+   ============================================================ */
+
+const Keystrokes = new Module("Keystrokes", "K");
+
+Keystrokes.onRender = function () {
     if (!this.enabled) return;
 
-    const keys = ["W", "A", "S", "D"];
-    let y = 20;
+    const keys = [
+        { key: "W", x: 20, y: 20 },
+        { key: "A", x: 5,  y: 35 },
+        { key: "S", x: 20, y: 35 },
+        { key: "D", x: 35, y: 35 }
+    ];
 
     keys.forEach(k => {
-        const pressed = ModAPI.isKeyDown(k);
+        const down = ModAPI.isKeyDown(k.key);
         ModAPI.drawStringOnScreen({
-            text: `${k}: ${pressed ? "§a■" : "§c■"}`,
-            x: 4,
-            y: y,
-            color: 0xFFFFFF,
+            text: `${k.key}: ${down ? "§a■" : "§c■"}`,
+            x: k.x,
+            y: k.y,
+            color: 0xffffff,
             shadow: true
         });
-        y += 10;
     });
 };
 
 /* ============================================================
-   EVENT HOOKS
+   EVENT HOOKS (CORRECT FOR 1.12)
    ============================================================ */
 
 ModAPI.addEventListener("key", (e) => {
     if (e.repeat) return;
     const key = e.key.toUpperCase();
-    if (Client.keybinds[key]) {
-        Client.keybinds[key]();
-    }
-});
-
-ModAPI.addEventListener("update", () => {
-    Client.modules.forEach(m => m.enabled && m.onUpdate());
-});
-
-ModAPI.addEventListener("renderOverlay", () => {
-    Client.modules.forEach(m => m.enabled && m.onRender());
-});
-
-/* ============================================================
-   Loading mgs
-   ============================================================ */
-
-ModAPI.addEventListener("load", () => {
-    Client.log(`§aLoaded ${Client.name} v${Client.version}`);
-});
+    if (
