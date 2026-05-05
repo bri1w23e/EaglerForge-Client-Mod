@@ -38,7 +38,7 @@ class Module {
 }
 
 // do this to add a module: 
-//new Module("MyFeature", "H", "Does something").onUpdate = function () {
+//new Module("MyFeature", "keybind", "Does something").onUpdate = function () {
     //if (!this.enabled) return;
     // your code
 //};
